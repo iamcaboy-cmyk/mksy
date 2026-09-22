@@ -1,0 +1,197 @@
+// Prisma Schema for Jan Sahayata (नागरिक सहायता) Portal
+// Models: User, Profile, Application, Beneficiary, BankDetails, Document, ApplicationStatusHistory, Admin, AuditLog
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CITIZEN
+  ADMIN
+  VERIFYING_OFFICER
+  DISTRICT_NODAL_OFFICER
+}
+
+enum ApplicationStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  DOCUMENT_VERIFICATION
+  APPROVED
+  REJECTED
+  RETURNED_FOR_CORRECTION
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DocumentType {
+  IDENTITY
+  BIRTH_CERT
+  ADDRESS
+  BANK_PASSBOOK
+  PHOTO
+  INCOME_CERT
+  OTHER
+}
+
+model User {
+  id           String        @id @default(uuid())
+  fullName     String
+  mobileNumber String        @unique
+  email        String        @unique
+  passwordHash String
+  state        String
+  district     String
+  address      String
+  aadhaarLast4 String        // Stored as 4 digits only (e.g. 5892)
+  isVerified   Boolean       @default(false)
+  role         Role          @default(CITIZEN)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  profile      Profile?
+  applications Application[]
+
+  @@index([mobileNumber])
+  @@index([email])
+}
+
+model Profile {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category    String?  // General, OBC, SC, ST, EWS
+  occupation  String?
+  annualIncome Float?
+  block       String?
+  pinCode     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Application {
+  id                 String                   @id @default(uuid())
+  applicationNumber  String                   @unique // e.g. JS-2026-481902
+  userId             String
+  user               User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status             ApplicationStatus        @default(DRAFT)
+  applicantName      String
+  parentName         String
+  dob                String
+  gender             String
+  category           String
+  mobile             String
+  address            String
+  district           String
+  block              String
+  pinCode            String
+  eligibilityPassed  Boolean                  @default(true)
+  remarks            String?
+  correctionNotes    String?
+  submittedAt        DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  beneficiary        Beneficiary?
+  bankDetails        BankDetails?
+  documents          Document[]
+  statusHistory      ApplicationStatusHistory[]
+
+  @@index([applicationNumber])
+  @@index([userId])
+  @@index([status])
+  @@index([district])
+}
+
+model Beneficiary {
+  id             String      @id @default(uuid())
+  applicationId  String      @unique
+  application    Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  childName      String
+  dob            String
+  gender         String
+  birthRegNumber String
+  relationship   String
+  schoolDetails  String?
+  gradeOrClass   String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model BankDetails {
+  id                 String             @id @default(uuid())
+  applicationId      String             @unique
+  application        Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  accountHolderName  String
+  bankName           String
+  branchName         String
+  accountNumber      String
+  ifscCode           String
+  verificationStatus VerificationStatus @default(VERIFIED)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model Document {
+  id                 String             @id @default(uuid())
+  applicationId      String
+  application        Application        @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  docType            DocumentType
+  fileName           String
+  fileSize           String
+  fileFormat         String
+  fileUrl            String?
+  verificationStatus VerificationStatus @default(PENDING)
+  officerRemarks     String?
+  uploadedAt         DateTime           @default(now())
+
+  @@index([applicationId])
+}
+
+model ApplicationStatusHistory {
+  id            String            @id @default(uuid())
+  applicationId String
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  status        ApplicationStatus
+  changedBy     String            // Officer Name / Citizen
+  remarks       String
+  timestamp     DateTime          @default(now())
+
+  @@index([applicationId])
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  username     String   @unique // e.g. admin@jansahayata.gov.in
+  fullName     String
+  role         Role     @default(VERIFYING_OFFICER)
+  passwordHash String
+  department   String
+  district     String   @default("All")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([username])
+}
+
+model AuditLogEntity {
+  id                String   @id @default(uuid())
+  applicationNumber String
+  action            String   // CREATE, SUBMIT, STATUS_CHANGE, DOCUMENT_VERIFY, RETURN_CORRECTION
+  performedBy       String
+  details           String
+  ipAddress         String   @default("127.0.0.1")
+  timestamp         DateTime @default(now())
+
+  @@index([applicationNumber])
+  @@index([timestamp])
+}

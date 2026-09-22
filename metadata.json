@@ -1,0 +1,6 @@
+{
+  "name": "Jan Sahayata",
+  "description": "Citizen Scheme & Direct Benefit Portal for registration, multi-step application workflow, status tracking, acknowledgement receipt, and admin verification.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
